@@ -5,6 +5,8 @@ from base64 import b64decode,b64encode
 from binascii import hexlify, unhexlify
 from os import popen
 from lxml import etree
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
 import html
 from Crypto.Cipher import AES
 from Crypto import Random
@@ -83,19 +85,19 @@ def pad(value, bs=BLOCKSIZE):
     return value + (chr(pv) * pv).encode()
 
 
-def encrypt(value, key):
-    iv = Random.new().read(BLOCKSIZE)
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    padded_value = pad(value)
-    return iv + cipher.encrypt(padded_value)
+def encrypt(value: bytes, key: bytes) -> bytes:
+    cipher = AES.new(key, AES.MODE_GCM)
+    ciphertext, tag = cipher.encrypt_and_digest(value)
+    return cipher.nonce + tag + ciphertext
 
 
-def decrypt(value, key):
-    iv = value[:BLOCKSIZE]
-    decrypt_value = value[BLOCKSIZE:]
-    cipher = AES.new(key, AES.MODE_CBC, iv)
-    decrypted = cipher.decrypt(decrypt_value)
-    return unpad(decrypted)
+def decrypt(value: bytes, key: bytes) -> bytes:
+    nonce = value[:16]          # AES GCM nonce = 16 bytes
+    tag   = value[16:32]        # Tag = 16 bytes
+    ciphertext = value[32:]
+
+    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    return cipher.decrypt_and_verify(ciphertext, tag)
 
 
 def rp(command):
